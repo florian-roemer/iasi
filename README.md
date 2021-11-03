@@ -1,4 +1,5 @@
-# Collection of scripts to calculate spectral fluxes averaged over every selected IASI orbit. It allows calculates the spectral fluxes for three different domains:
+# Collection of scripts to calculate spectral fluxes averaged over every selected IASI orbit. 
+It allows calculations of the spectral fluxes for three different domains:
     1) all-sky in the whole tropics ("tropics")
     2) all-sky over the tropical ocean ("ocean")
     3) clear-sky over the tropical ocean ("clear")
