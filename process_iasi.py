@@ -50,7 +50,7 @@ def read_data(FILEPATH):
     idata.get_orbit_lat_lon()
     idata.get_spec_orbit()
 
-    print(idata.spectra_orbit[0, 1000, 0, 0])
+    print(f'input radiance: {idata.spectra_orbit[0, 1000:1005, 0, 0]}')
 
     return idata
 
@@ -167,7 +167,7 @@ def process_data(radiance, angle, mask, domain, orbit):
     specflux = calc_specflux(radcos, fullangle)
     save_flux(specflux, nobs, frac, year, month, orbit, domain)
 
-    print(specflux[1000])
+    print(f'output flux for domain {domain}: {specflux[1000]}')
 
 
 def save_flux(specflux, nobs, frac, year, month, orbit, domain):
@@ -192,7 +192,7 @@ def main(FILE):
     idata = read_data(FILE)
 
     # assign
-    orbit = FILE[74:105]
+    orbit = FILE[95:126]
     radiance = idata.spectra_orbit * 100  # convert units to W cm m-2 sr-1
     lat = idata.lat_orbit
     angle = idata.GGeoSondAnglesMETOP[:, :, :, 0]
@@ -213,7 +213,7 @@ def main(FILE):
 
 if __name__ == '__main__':
     start = time.process_time()
-    os.chdir('/work/um0878/user_data/froemer/rare_mistral/scripts/')
+    os.chdir('/DSNNAS/Repro_Temp/users/vijuj/git/iasi/')
 
     year = sys.argv[1]
     month = sys.argv[2]
@@ -223,7 +223,7 @@ if __name__ == '__main__':
            f'native/{year}/{month}/{day}/'
 
     for FILE in np.sort(glob.glob(PATH + 'IASI*', recursive=False)):
-        print(FILE[95:126])
+        print(f'Processing orbit {FILE[95:126]}')
         try:
             main(FILE)
         except:
