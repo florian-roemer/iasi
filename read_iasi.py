@@ -1,7 +1,6 @@
 import os
 import sys
 import numpy as np
-import time
 # generic EPS library
 os.environ["EUGENE_HOME"] = os.environ["HOME"] + "/.local/share/eugene"
 import eugene
@@ -21,8 +20,7 @@ class data:
       repeat step4 for every mdr desired
     """
 
-    def __init__(self, IasiFile, openOption='r', giadr_sf_read=True,
-                 mdr=None):
+    def __init__(self, IasiFile, openOption='r', giadr_sf_read=True):
         """
         init the :func:`data`class
 
@@ -35,12 +33,7 @@ class data:
 
         self.IasiFile = IasiFile
         self.L1c_data = eugene.Product(self.IasiFile, openOption)
-
-        if mdr is None:
-            self.nbMDR = self.L1c_data.get("mdr-1c.!items")
-        else:
-            self.nbMDR = len(mdr)
-            self.MDR = mdr
+        self.nbMDR = self.L1c_data.get("mdr-1c.!items")
 
         self._spectra = []
         self.wavenumber = []
@@ -67,17 +60,17 @@ class data:
         # read instrument angles
         self.GGeoSondAnglesMETOP = np.array(
             [self.L1c_data.get("mdr-1c[%d].GGeoSondAnglesMETOP" % mdr)
-             for mdr in self.MDR])
+             for mdr in range(self.nbMDR)])
 
         # read cloud fraction
         self.GEUMAvhrr1BCldFrac = np.array(
             [self.L1c_data.get("mdr-1c[%d].GEUMAvhrr1BCldFrac" % mdr)
-             for mdr in self.MDR])
+             for mdr in range(self.nbMDR)])
 
         # read land fraction
         self.GEUMAvhrr1BLandFrac = np.array(
             [self.L1c_data.get("mdr-1c[%d].GEUMAvhrr1BLandFrac" % mdr)
-             for mdr in self.MDR])
+             for mdr in range(self.nbMDR)])
 
     def _read_giadr_sf(self):
         self.IDefScaleSondNbScale = self.L1c_data.get(
@@ -123,11 +116,11 @@ class data:
         # for the full orbit (=x mdr)
         # spec[mdr,8461,4,30]
 
-        for m, mdr in enumerate(self.MDR):
+        for mdr in range(self.nbMDR):
             sp = self.read_spectra(mdr)
             for ip in range(4):
                 for ifov in range(30):
-                    self.spectra_orbit[m, :, ifov, ip] = \
+                    self.spectra_orbit[mdr, :, ifov, ip] = \
                         self.get_spectra(ifov, ip)
 
     def _apply_sf(self, spectra):
@@ -154,26 +147,20 @@ class data:
         self.lon = lon
 
     def get_orbit_lat_lon(self):
-        for m, mdr in enumerate(self.MDR):
+        for mdr in range(self.nbMDR):
             self.read_geoloc(mdr)
-            self.lat_orbit[m, :] = np.array(self.lat)
-            self.lon_orbit[m, :] = np.array(self.lon)
+            self.lat_orbit[mdr, :] = np.array(self.lat)
+            self.lon_orbit[mdr, :] = np.array(self.lon)
 
 
 if __name__ == '__main__':
-    start = time.process_time()
-
-    mdr = np.concatenate((np.arange(50, 250), np.arange(430, 630)))
     mydata = data('/mnt/lustre02/work/um0878/data/iasi/iasi-l1/reprocessed/'
-                  'm02/2017/07/15/'
-                  'IASI_xxx_1C_M02_20170715174155Z_20170715192059Z_N_O_'
-                  '20170715192029Z',
-                  mdr=mdr)
+                  'm02/2017/01/01/'
+                  'IASI_xxx_1C_M02_20170101063252Z_20170101081452Z_N_O_'
+                  '20170101081316Z')
 
     mydata.get_orbit_lat_lon()
     mydata.get_spec_orbit()
     print("Lon shape: ", mydata.lon_orbit.shape)
     print("Lat shape: ", mydata.lat_orbit.shape)
     print("Data shape: ", mydata.spectra_orbit.shape)
-    end = time.process_time()
-    print(end - start)

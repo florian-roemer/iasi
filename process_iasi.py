@@ -3,10 +3,11 @@
 """
 This scripts filters and averages IASI spectral radiances from one orbit and
 calculates spectral fluxes using angular interpolation and integration.
-It currently calculates the mean spectral fluxes over three domains:
-    1) all-sky in the whole tropics ("tropics")
-    2) all-sky over the tropical ocean ("ocean")
-    3) clear-sky over the tropical ocean ("clear")
+It currently calculates the mean spectral fluxes over eight domains, namely
+all combinations of:
+    1) global and tropics
+    2) all-sky and clear-sky
+    3) land+ocean and ocean-only
 
 The script takes three input parameters:
     1) the year,
@@ -20,6 +21,7 @@ save and read routines (pickle=False):
     1) flux_<DATE_AND_TIME_OF_ORBIT>: spectral flux for each of IASI's 8461
     channels
     2) nobs_<DATE_AND_TIME_OF_ORBIT>: number of pixels used for this mean
+    3) frac_<DATE_AND_TIME_OF_ORBIT>: fraction pixels used relative to total
 
 Both are needed for calculating weighted averages of multiple orbits.
 
@@ -34,6 +36,7 @@ import scipy.interpolate
 import sys
 import time
 
+# used module CHANGED
 import read_iasi as ri
 
 
@@ -42,42 +45,38 @@ def read_data(FILEPATH):
     read IASI data from eps file using readin_eps reading routine
     only read spectra (sub-) tropical latitudes (empirical)
     '''
-    mdr = np.concatenate((np.arange(50, 250), np.arange(430, 630)))
-    idata = ri.data(FILEPATH, mdr=mdr)
+    idata = ri.data(FILEPATH)
 
     idata.get_orbit_lat_lon()
     idata.get_spec_orbit()
 
-    print(idata.spectra_orbit[0, 0, 0, 0])
-    
-    print('finished reading ...')
-    
+    print(idata.spectra_orbit[0, 1000, 0, 0])
+
     return idata
 
 
-def create_masks(lat, land_frac, cloud_frac):
+def create_mask(lat, land_frac, cloud_frac, domain):
     '''
-    This function creates three masks:
-        1) the whole tropics
-        2) the tropical ocean
-        3) clear-sky pixels over tropical ocean
+    This function creates the mask for the selected domain.
     '''
     # initialize
-    trop, tropocean, cstropocean = np.full(
-            (3, lat.shape[0], lat.shape[1], lat.shape[2], 1), True, dtype=bool)
+    mask = np.full((lat.shape[0], lat.shape[1], lat.shape[2], 1),
+                   True, dtype=bool)
 
     # filters
-    trop[:, :, :, 0] = (abs(lat) < 30)
+    trop = (abs(lat) < 30)
     clear_sky = (cloud_frac == 0)
     ocean = (land_frac == 0)
 
     # create masks
-    tropocean[:, :, :, 0] = ~np.ma.mask_or(~trop[:, :, :, 0],
-                                           ~ocean)
-    cstropocean[:, :, :, 0] = ~np.ma.mask_or(~tropocean[:, :, :, 0],
-                                             ~clear_sky)
+    if 'tropics' in domain:
+        mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], trop)
+    if 'clear-sky' in domain:
+        mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], clear_sky)
+    if 'ocean' in domain:
+        mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], ocean)
 
-    return trop, tropocean, cstropocean
+    return mask
 
 
 def masked_average(radiance, angle, mask):
@@ -157,27 +156,35 @@ def process_data(radiance, angle, mask, domain, orbit):
     '''
     Encapsulates processing steps applied to the different domains (masks).
     '''
+
     nobs = np.count_nonzero(mask)
+    frac = np.count_nonzero(mask)/mask.size
+
     rad, ang = masked_average(radiance, angle, mask)
     meanangle, meanrad = average_symmetric_angles(ang, rad)
     fullangle, radcos = prepare_interpolation(meanangle, meanrad)
     radcos = interpolate(fullangle, radcos)
     specflux = calc_specflux(radcos, fullangle)
-    save_flux(specflux, nobs, year, month, orbit, domain)
+    save_flux(specflux, nobs, frac, year, month, orbit, domain)
 
-    return specflux, nobs
+    print(specflux[1000])
 
 
-def save_flux(specflux, nobs, year, month, orbit, domain):
+def save_flux(specflux, nobs, frac, year, month, orbit, domain):
     '''
-    Averaged fluxes and number of considered pixels are saved.
+    Averaged fluxes (specflux), number of filtered pixels (nobs)
+    and fraction of total pixels used are saved.
     '''
-    np.save('/DSNNAS/Repro_Temp/users/vijuj/data/iasi_flux/{}/{}/{}/nobs_{}'
-            .format(domain, year, month, orbit),
-            nobs, allow_pickle=False, fix_imports=False)
-    np.save('/DSNNAS/Repro_Temp/users/vijuj/data/iasi_flux/{}/{}/{}/flux_{}'
-            .format(domain, year, month, orbit),
-            specflux, allow_pickle=False, fix_imports=False)
+
+    np.save(f'/DSNNAS/Repro_Temp/users/vijuj/data/iasi_flux/{domain}/'
+            f'{year}/{month}/flux_{}', specflux,
+            allow_pickle=False, fix_imports=False)
+    np.save(f'/DSNNAS/Repro_Temp/users/vijuj/data/iasi_flux/{domain}/'
+            f'{year}/{month}/nobs_{orbit}', nobs,
+            allow_pickle=False, fix_imports=False)
+    np.save(f'/DSNNAS/Repro_Temp/users/vijuj/data/iasi_flux/{domain}/'
+            f'{year}/{month}/frac_{}', frac,
+            allow_pickle=False, fix_imports=False)
 
 
 def main(FILE):
@@ -185,7 +192,7 @@ def main(FILE):
     idata = read_data(FILE)
 
     # assign
-    orbit = FILE[95:126]
+    orbit = FILE[74:105]
     radiance = idata.spectra_orbit * 100  # convert units to W cm m-2 sr-1
     lat = idata.lat_orbit
     angle = idata.GGeoSondAnglesMETOP[:, :, :, 0]
@@ -196,32 +203,29 @@ def main(FILE):
     lat = lat.reshape(lat.shape[0], 30, 4)
     radiance = radiance.transpose((0, 2, 3, 1))
 
-    # create masks
-    mtrop, mocean, mclear = create_masks(lat, land_frac, cloud_frac)
-
-    # process data
-    trop, ntrop = process_data(radiance, angle, mtrop, 'trop', orbit)
-    ocean, nocean = process_data(radiance, angle, mocean, 'ocean', orbit)
-    clear, nclear = process_data(radiance, angle, mclear, 'clear', orbit)
-
-    return trop, ntrop, ocean, nocean, clear, nclear
+    for dom1 in ['global', 'tropics']:
+        for dom2 in ['all-sky', 'clear-sky']:
+            for dom3 in ['whole', 'ocean']:
+                domain = f'{dom1}/{dom2}/{dom3}'
+                mask = create_mask(lat, land_frac, cloud_frac, domain)
+                process_data(radiance, angle, mask, domain, orbit)
 
 
 if __name__ == '__main__':
     start = time.process_time()
-    os.chdir('/DSNNAS/Repro_Temp/users/vijuj/git/iasi/')
+    os.chdir('/work/um0878/user_data/froemer/rare_mistral/scripts/')
 
     year = sys.argv[1]
     month = sys.argv[2]
     day = sys.argv[3]
 
-    PATH = '/DSNNAS/Repro/iasi/IASI_eum_fcdr_r0100/data/M02/level1c/iasi/native/{}/{}/{}/'\
-           .format(year, month, day)
+    PATH = f'/DSNNAS/Repro/iasi/IASI_eum_fcdr_r0100/data/M02/level1c/iasi/'\
+           f'native/{year}/{month}/{day}/'
 
-    for FILE in np.sort(glob.glob(PATH + 'IASI*', recursive=False))[0:1]:
+    for FILE in np.sort(glob.glob(PATH + 'IASI*', recursive=False)):
         print(FILE[95:126])
         try:
-            trop, ntrop, ocean, nocean, clear, nclear = main(FILE)
+            main(FILE)
         except:
             print(f'Invalid value encountered in {FILE}.'
                   'Skipping this orbit.')
