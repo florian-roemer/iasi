@@ -48,6 +48,10 @@ def read_data(FILEPATH):
     idata.get_orbit_lat_lon()
     idata.get_spec_orbit()
 
+    print(idata.spectra_orbit[0, 0, 0, 0])
+    
+    print('finished reading ...')
+    
     return idata
 
 
@@ -168,10 +172,10 @@ def save_flux(specflux, nobs, year, month, orbit, domain):
     '''
     Averaged fluxes and number of considered pixels are saved.
     '''
-    np.save('../data/IASI/test_new/{}/{}/{}/nobs_{}'
+    np.save('/DSNNAS/Repro_Temp/users/vijuj/data/iasi_flux/{}/{}/{}/nobs_{}'
             .format(domain, year, month, orbit),
             nobs, allow_pickle=False, fix_imports=False)
-    np.save('../data/IASI/test_new/{}/{}/{}/flux_{}'
+    np.save('/DSNNAS/Repro_Temp/users/vijuj/data/iasi_flux/{}/{}/{}/flux_{}'
             .format(domain, year, month, orbit),
             specflux, allow_pickle=False, fix_imports=False)
 
@@ -181,7 +185,7 @@ def main(FILE):
     idata = read_data(FILE)
 
     # assign
-    orbit = FILE[74:105]
+    orbit = FILE[95:126]
     radiance = idata.spectra_orbit * 100  # convert units to W cm m-2 sr-1
     lat = idata.lat_orbit
     angle = idata.GGeoSondAnglesMETOP[:, :, :, 0]
@@ -205,16 +209,17 @@ def main(FILE):
 
 if __name__ == '__main__':
     start = time.process_time()
-    os.chdir('/work/um0878/user_data/froemer/rare_mistral/scripts/')
+    os.chdir('/DSNNAS/Repro_Temp/users/vijuj/git/iasi/')
 
     year = sys.argv[1]
     month = sys.argv[2]
     day = sys.argv[3]
 
-    PATH = '/work/um0878/data/iasi/iasi-l1/reprocessed/m02/{}/{}/{}/'\
+    PATH = '/DSNNAS/Repro/iasi/IASI_eum_fcdr_r0100/data/M02/level1c/iasi/native/{}/{}/{}/'\
            .format(year, month, day)
 
-    for FILE in glob.glob(PATH + 'IASI*', recursive=False):
+    for FILE in np.sort(glob.glob(PATH + 'IASI*', recursive=False))[0:1]:
+        print(FILE[95:126])
         try:
             trop, ntrop, ocean, nocean, clear, nclear = main(FILE)
         except:
