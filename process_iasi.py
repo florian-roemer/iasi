@@ -36,7 +36,6 @@ import scipy.interpolate
 import sys
 import time
 
-# used module CHANGED
 import read_iasi as ri
 
 
@@ -73,7 +72,7 @@ def create_mask(lat, land_frac, cloud_frac, domain):
         mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], trop)
     if 'clear-sky' in domain:
         mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], clear_sky)
-    if 'ocean' in domain:
+    if 'ocean-only' in domain:
         mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], ocean)
 
     return mask
