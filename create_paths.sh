@@ -14,8 +14,16 @@ for dom3 in ${domain3[@]}
 do
 for year in {2007..2021}
 do
-mkdir -p $data/$dom1/$dom2/$dom3/$year
+for month in {1..9}
+do
+mkdir -p $data/$dom1/$dom2/$dom3/$year/'0'$month
+done
+for month in {10..12}
+do
+mkdir -p $data/$dom1/$dom2/$dom3/$year/$month
 done
 done
 done
 done
+done
+

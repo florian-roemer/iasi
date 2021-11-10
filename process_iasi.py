@@ -176,13 +176,13 @@ def save_flux(specflux, nobs, frac, year, month, orbit, domain):
     '''
 
     np.save(f'/work/um0878/user_data/froemer/rare_mistral/data/IASI/test_new/'
-            f'{domain}/{year}/{month}/nobs_{orbit}',
+            f'test/{domain}/{year}/{month}/nobs_{orbit}',
             nobs, allow_pickle=False, fix_imports=False)
     np.save(f'/work/um0878/user_data/froemer/rare_mistral/data/IASI/test_new/'
-            f'{domain}/{year}/{month}/flux_{orbit}',
+            f'test/{domain}/{year}/{month}/flux_{orbit}',
             specflux, allow_pickle=False, fix_imports=False)
     np.save(f'/work/um0878/user_data/froemer/rare_mistral/data/IASI/test_new/'
-            f'{domain}/{year}/{month}/frac_{orbit}',
+            f'test/{domain}/{year}/{month}/frac_{orbit}',
             frac, allow_pickle=False, fix_imports=False)
 
 
@@ -204,7 +204,7 @@ def main(FILE):
 
     for dom1 in ['global', 'tropics']:
         for dom2 in ['all-sky', 'clear-sky']:
-            for dom3 in ['whole', 'ocean']:
+            for dom3 in ['land+ocean', 'ocean-only']:
                 domain = f'{dom1}/{dom2}/{dom3}'
                 mask = create_mask(lat, land_frac, cloud_frac, domain)
                 process_data(radiance, angle, mask, domain, orbit)
@@ -212,23 +212,24 @@ def main(FILE):
 
 if __name__ == '__main__':
     start = time.process_time()
-    os.chdir('/work/um0878/user_data/froemer/rare_mistral/scripts/eumetsat')
+#    os.chdir('/work/um0878/user_data/froemer/rare_mistral/scripts/eumetsat')
+#    os.chdir('~/iasi')
 
     year = sys.argv[1]
     month = sys.argv[2]
     day = sys.argv[3]
 
-    PATH = f'/work/um0878/data/iasi/iasi-l1/reprocessed/m02/'
+    PATH = f'/work/um0878/data/iasi/iasi-l1/reprocessed/m02/'\
            f'{year}/{month}/{day}/'
 
-    for FILE in np.sort(glob.glob(PATH + 'IASI*', recursive=False))[10:11]:
+    for FILE in np.sort(glob.glob(PATH + 'IASI*', recursive=False))[0:1]:
         print(FILE[74:105])
-        try:
-            main(FILE)
-        except:
-            print(f'Invalid value encountered in {FILE}.'
-                  'Skipping this orbit.')
-            pass
+#        try:
+        main(FILE)
+#        except:
+#            print(f'Invalid value encountered in {FILE}.'
+#                  'Skipping this orbit.')
+#            pass
 
     end = time.process_time()
     print(end - start)
