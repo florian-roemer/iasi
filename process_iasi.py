@@ -231,4 +231,4 @@ if __name__ == '__main__':
             pass
 
     end = time.process_time()
-    print(f'Your program needed {end - start)} seconds ({(end-start)/60} minutes)')
+    print(f'Your program needed {end - start} seconds ({(end-start)/60} minutes)')
