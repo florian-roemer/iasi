@@ -205,7 +205,7 @@ def main(FILE):
 
     for dom1 in ['global', 'tropics']:
         for dom2 in ['all-sky', 'clear-sky']:
-            for dom3 in ['whole', 'ocean']:
+            for dom3 in ['land+ocean', 'ocean-only']:
                 domain = f'{dom1}/{dom2}/{dom3}'
                 mask = create_mask(lat, land_frac, cloud_frac, domain)
                 process_data(radiance, angle, mask, domain, orbit)
