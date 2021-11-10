@@ -16,14 +16,16 @@ The script takes three input parameters:
 
 that should be processed. The script then loops over all orbits on that day
 and calculates average spectral fluxes for each of them separately.
-The output are two .npy type files. They can be read in using numpy's
-save and read routines (pickle=False):
+The output are three .npy type files. They can be read in using numpy's
+numpy.save and numpy.load routines (pickle=False):
     1) flux_<DATE_AND_TIME_OF_ORBIT>: spectral flux for each of IASI's 8461
     channels
     2) nobs_<DATE_AND_TIME_OF_ORBIT>: number of pixels used for this mean
-    3) frac_<DATE_AND_TIME_OF_ORBIT>: fraction pixels used relative to total
+    3) frac_<DATE_AND_TIME_OF_ORBIT>: fraction of pixels used relative to total
 
-Both are needed for calculating weighted averages of multiple orbits.
+The first two are needed for calculating weighted averages of multiple orbits,
+the last one for inferring the values for the 1) extratropics 2) "cloudy"-sky
+3) land-only.
 
 @author: Florian Roemer (florian.roemer@uni-hamburg.de)
 """
@@ -220,7 +222,7 @@ if __name__ == '__main__':
            f'{year}/{month}/{day}/'
 
     for FILE in np.sort(glob.glob(PATH + 'IASI*', recursive=False)):
-        print(f'Processing orbit {FILE[95:126]}')
+        print(f'Processing orbit {FILE[74:105]}')
         try:
             main(FILE)
         except:
