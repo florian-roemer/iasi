@@ -48,7 +48,7 @@ def read_data(FILEPATH):
     idata.get_orbit_lat_lon()
     idata.get_spec_orbit()
 
-    print(idata.spectra_orbit[0, 1000, 0, 0])
+    print(f'input radiance: {idata.spectra_orbit[0, 1000:1005, 0, 0]}')
 
     return idata
 
@@ -166,7 +166,7 @@ def process_data(radiance, angle, mask, domain, orbit):
     specflux = calc_specflux(radcos, fullangle)
     save_flux(specflux, nobs, frac, year, month, orbit, domain)
 
-    print(specflux[1000])
+    print(f'output flux for domain {domain}: {specflux[1000]}')
 
 
 def save_flux(specflux, nobs, frac, year, month, orbit, domain):
@@ -220,7 +220,7 @@ if __name__ == '__main__':
            f'{year}/{month}/{day}/'
 
     for FILE in np.sort(glob.glob(PATH + 'IASI*', recursive=False)):
-        print(FILE[74:105])
+        print(f'Processing orbit {FILE[95:126]}')
         try:
             main(FILE)
         except:
@@ -229,4 +229,4 @@ if __name__ == '__main__':
             pass
 
     end = time.process_time()
-    print(end - start)
+    print(f'Your program needed {end - start)} seconds ({(end-start)/60} minutes)')
