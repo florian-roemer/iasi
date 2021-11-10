@@ -1,6 +1,6 @@
 #!/bin/bash
 
-data='/DSNNAS/Repro/iasi/IASI_eum_fcdr_r0100/data/M02/level1c/iasi/native'
+data='/DSNNAS/Repro_Temp/users/vijuj/data/iasi_flux'
 
 domain1=( "global" "tropics")
 domain2=( "all-sky" "clear-sky")
