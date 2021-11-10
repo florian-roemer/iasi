@@ -30,7 +30,6 @@ Both are needed for calculating weighted averages of multiple orbits.
 
 import glob
 import numpy as np
-import os
 import scipy.integrate
 import scipy.interpolate
 import sys
@@ -73,7 +72,7 @@ def create_mask(lat, land_frac, cloud_frac, domain):
         mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], trop)
     if 'clear-sky' in domain:
         mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], clear_sky)
-    if 'ocean' in domain:
+    if 'ocean-only' in domain:
         mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], ocean)
 
     return mask
@@ -212,8 +211,6 @@ def main(FILE):
 
 if __name__ == '__main__':
     start = time.process_time()
-#    os.chdir('/work/um0878/user_data/froemer/rare_mistral/scripts/eumetsat')
-#    os.chdir('~/iasi')
 
     year = sys.argv[1]
     month = sys.argv[2]
@@ -222,14 +219,14 @@ if __name__ == '__main__':
     PATH = f'/work/um0878/data/iasi/iasi-l1/reprocessed/m02/'\
            f'{year}/{month}/{day}/'
 
-    for FILE in np.sort(glob.glob(PATH + 'IASI*', recursive=False))[0:1]:
+    for FILE in np.sort(glob.glob(PATH + 'IASI*', recursive=False)):
         print(FILE[74:105])
-#        try:
-        main(FILE)
-#        except:
-#            print(f'Invalid value encountered in {FILE}.'
-#                  'Skipping this orbit.')
-#            pass
+        try:
+            main(FILE)
+        except:
+            print(f'Invalid value encountered in {FILE}.'
+                  'Skipping this orbit.')
+            pass
 
     end = time.process_time()
     print(end - start)
