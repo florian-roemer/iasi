@@ -24,6 +24,7 @@ year, month, day = '2013', '03', '01'
 PATH = f'/work/um0878/data/iasi/iasi-l1/reprocessed/m02/'\
        f'{year}/{month}/{day}/'
 
+
 for FILE in np.sort(glob.glob(PATH + 'IASI*', recursive=False))[0:1]:
 
     # read IASI data
@@ -82,3 +83,8 @@ weights = get_scaling_factor(lat)
 plt.figure()
 plt.hist(weights.flatten(), bins=1000)
 plt.savefig('weight_plot3.png', dpi=300)
+
+ # %%
+
+
+
