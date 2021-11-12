@@ -44,26 +44,31 @@ cos_weighted = raw[0]*np.cos(np.deg2rad(np.arange(-90, 90)))
 cos = np.cos(np.deg2rad(np.arange(-90, 90)))
 lats = np.arange(-90, 90)
 
-plt.plot(lats, raw[0]/cos_weighted.max(), label='no weights')
-plt.plot(lats, cos_weighted/cos_weighted.max(), label='cosine weighted')
-plt.plot(lats, cos,
+plt.plot(lats, raw[0], label='no weights')
+plt.plot(lats, cos_weighted, label='cosine weighted')
+plt.plot(lats, cos*cos_weighted.max(),
          label='pure cosine (actual area)')
 plt.vlines(-30, 0, raw[0].max()/cos_weighted.max())
 plt.vlines(30, 0, raw[0].max()/cos_weighted.max())
 plt.xticks(np.arange(-90, 92, 30))
-plt.ylim(0, raw[0].max()/cos_weighted.max())
+plt.ylabel('absolute frequency')
+plt.ylim(0, raw[0].max())
 plt.legend(loc='upper center')
+plt.savefig('weight_plot.png', dpi=300)
 
 plt.figure()
 factor = cos/(cos_weighted/cos_weighted[90])
 factor2 =  raw[0][90]/raw[0]
-plt.plot(lats, raw[0][90]/raw[0])
-plt.plot(lats, cos)
-plt.plot(lats, cos*raw[0][90]/raw[0])
+plt.plot(lats, raw[0][90]/raw[0], label='other')
+plt.plot(lats, cos*raw[0][90]/raw[0], label='total')
+plt.plot(lats, cos, label='cosine')
 #plt.scatter(lats, factor, s=8)
 plt.hlines(1, -90, 90)
+plt.ylabel('scaling factor')
 plt.xticks(np.arange(-90, 92, 30))
 plt.ylim(0,2)
+plt.legend()
+plt.savefig('weight_plot2.png', dpi=300)
 
 
 def get_scaling_factor(lat):
@@ -76,3 +81,4 @@ def get_scaling_factor(lat):
 weights = get_scaling_factor(lat)
 plt.figure()
 plt.hist(weights.flatten(), bins=1000)
+plt.savefig('weight_plot3.png', dpi=300)
