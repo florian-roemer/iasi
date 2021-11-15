@@ -237,7 +237,7 @@ if __name__ == '__main__':
     PATH = f'/work/um0878/data/iasi/iasi-l1/reprocessed/m02/'\
            f'{year}/{month}/{day}/'
 
-    for FILE in np.sort(glob.glob(PATH + 'IASI*', recursive=False))[:1]:
+    for FILE in np.sort(glob.glob(PATH + 'IASI*', recursive=False)):
         print(f'Processing orbit {FILE[74:105]}')
         try:
             main(FILE)
