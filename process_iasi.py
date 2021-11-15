@@ -239,8 +239,6 @@ if __name__ == '__main__':
 
     for FILE in np.sort(glob.glob(PATH + 'IASI*', recursive=False))[:1]:
         print(f'Processing orbit {FILE[74:105]}')
-        a = time.process_time()
-        print(a-start)
         try:
             main(FILE)
         except:
