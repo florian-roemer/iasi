@@ -26,6 +26,9 @@ numpy.save and numpy.load routines (pickle=False):
 The first two are needed for calculating weighted averages of multiple orbits,
 the last one for inferring the values for the 1) extratropics 2) "cloudy"-sky
 3) land-only.
+    
+To run this script on mistral first run in terminal:
+module load anaconda3/.bleeding_edge
 
 @author: Florian Roemer (florian.roemer@uni-hamburg.de)
 """
@@ -71,7 +74,7 @@ def create_mask(lat, land_frac, cloud_frac, domain):
 
     # create masks
     if 'tropics' in domain:
-        mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], trop)
+        mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], trop[:, :, :, 0])
     if 'clear-sky' in domain:
         mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], clear_sky)
     if 'ocean-only' in domain:
@@ -80,17 +83,30 @@ def create_mask(lat, land_frac, cloud_frac, domain):
     return mask
 
 
-def masked_average(radiance, angle, mask):
+def masked_average(radiance, angle, mask, lat, scale):
     '''
     This functions averages the fluxes along track as well as over each
     scanning angle (4 pixels per scanning angle), apllying the three different
-    masks.
+    masks. The radiance are weighted by the cosine of their latitude (cos)
     '''
+
     # apply masks and average over all scans and all pixels per scan
+    start = time.process_time()
+#    cos = np.cos(np.deg2rad(lat))
+#    rad = np.divide(np.sum(radiance * mask * cos * weight, axis=(0, 2)),
+#                    np.sum(mask * cos * weight, axis=(0, 2)))
+#    rad = np.divide(np.sum(radiance * mask * scale, axis=(0, 2)),
+#                    np.sum(mask * scale, axis=(0, 2)))
     rad = np.divide(np.sum(radiance * mask, axis=(0, 2)),
-                    np.sum(mask, axis=(0, 2)))
-    ang = np.divide(np.sum(angle * mask[:, :, :, 0], axis=(0, 2)),
-                    np.sum(mask[:, :, :, 0], axis=(0, 2)))
+                    np.sum(mask * scale, axis=(0, 2)))
+
+    end = time.process_time()
+    ang = np.divide(np.sum(angle * mask[:, :, :, 0] * scale[:, :, :, 0],
+                           axis=(0, 2)),
+                    np.sum(mask[:, :, :, 0] * scale[:, :, :, 0],
+                           axis=(0, 2)))
+    print(end-start)
+
 
     return rad, ang
 
@@ -153,7 +169,7 @@ def calc_specflux(radcos, fullangle):
     return specflux
 
 
-def process_data(radiance, angle, mask, domain, orbit):
+def process_data(radiance, angle, mask, domain, orbit, lat, scale):
     '''
     Encapsulates processing steps applied to the different domains (masks).
     '''
@@ -161,7 +177,7 @@ def process_data(radiance, angle, mask, domain, orbit):
     nobs = np.count_nonzero(mask)
     frac = np.count_nonzero(mask)/mask.size
 
-    rad, ang = masked_average(radiance, angle, mask)
+    rad, ang = masked_average(radiance, angle, mask, lat, scale)
     meanangle, meanrad = average_symmetric_angles(ang, rad)
     fullangle, radcos = prepare_interpolation(meanangle, meanrad)
     radcos = interpolate(fullangle, radcos)
@@ -200,15 +216,27 @@ def main(FILE):
     land_frac = idata.GEUMAvhrr1BLandFrac[:, :, :]
 
     # ensure consistent dimensions
-    lat = lat.reshape(lat.shape[0], 30, 4)
+    lat = lat.reshape(lat.shape[0], 30, 4, 1)
     radiance = radiance.transpose((0, 2, 3, 1))
+
+    # read factor correcting systematic oversampling of sub-polar latitudes
+    # using 180 bins from -90 to 90, they are centered at -89.5, -88.5 ... 89.5
+    factor = np.load('/pf/u/u301023/iasi/factor.npy')
+    index = np.round(lat + 89.5).astype('int')
+    weight = factor[index]
+    cos = np.cos(np.deg2rad(lat))
+    scale = cos*weight
+
+    # scale radiance with cosine of latitude and correct oversampling of
+    # sup-polar latitudes
+    radiance = radiance * scale
 
     for dom1 in ['global', 'tropics']:
         for dom2 in ['all-sky', 'clear-sky']:
             for dom3 in ['land+ocean', 'ocean-only']:
                 domain = f'{dom1}/{dom2}/{dom3}'
                 mask = create_mask(lat, land_frac, cloud_frac, domain)
-                process_data(radiance, angle, mask, domain, orbit)
+                process_data(radiance, angle, mask, domain, orbit, lat, scale)
 
 
 if __name__ == '__main__':
@@ -217,12 +245,14 @@ if __name__ == '__main__':
     year = sys.argv[1]
     month = sys.argv[2]
     day = sys.argv[3]
-
+    
     PATH = f'/work/um0878/data/iasi/iasi-l1/reprocessed/m02/'\
            f'{year}/{month}/{day}/'
 
-    for FILE in np.sort(glob.glob(PATH + 'IASI*', recursive=False)):
+    for FILE in np.sort(glob.glob(PATH + 'IASI*', recursive=False))[:1]:
         print(f'Processing orbit {FILE[74:105]}')
+        a = time.process_time()
+        print(a-start)
         try:
             main(FILE)
         except:
@@ -231,4 +261,4 @@ if __name__ == '__main__':
             pass
 
     end = time.process_time()
-    print(f'Your program needed {end - start} seconds ({(end-start)/60} minutes)')
+    print(f'Your program needed {(end-start)/60} minutes.')

@@ -28,4 +28,10 @@ for f, FILE in enumerate(LIST):
 np.save('/work/um0878/user_data/froemer/rare_mistral/data/IASI/factor/'
         'histogram.npy', hist, allow_pickle=False)
 
+# %%
 
+hist = np.load('/work/um0878/user_data/froemer/rare_mistral/data/IASI/factor/'
+               'histogram.npy')
+
+factor = np.sum(hist, axis=0)[90:92].mean()/np.sum(hist, axis=0)
+np.save('/pf/u/u301023/iasi/factor.npy', factor, allow_pickle=False)
