@@ -87,26 +87,14 @@ def masked_average(radiance, angle, mask, lat, scale):
     '''
     This functions averages the fluxes along track as well as over each
     scanning angle (4 pixels per scanning angle), apllying the three different
-    masks. The radiance are weighted by the cosine of their latitude (cos)
+    masks.
     '''
 
     # apply masks and average over all scans and all pixels per scan
-    start = time.process_time()
-#    cos = np.cos(np.deg2rad(lat))
-#    rad = np.divide(np.sum(radiance * mask * cos * weight, axis=(0, 2)),
-#                    np.sum(mask * cos * weight, axis=(0, 2)))
-#    rad = np.divide(np.sum(radiance * mask * scale, axis=(0, 2)),
-#                    np.sum(mask * scale, axis=(0, 2)))
     rad = np.divide(np.sum(radiance * mask, axis=(0, 2)),
                     np.sum(mask * scale, axis=(0, 2)))
-
-    end = time.process_time()
-    ang = np.divide(np.sum(angle * mask[:, :, :, 0] * scale[:, :, :, 0],
-                           axis=(0, 2)),
-                    np.sum(mask[:, :, :, 0] * scale[:, :, :, 0],
-                           axis=(0, 2)))
-    print(end-start)
-
+    ang = np.divide(np.sum(angle * (mask * scale)[:, :, :, 0], axis=(0, 2)),
+                    np.sum((mask * scale)[:, :, :, 0], axis=(0, 2)))
 
     return rad, ang
 
