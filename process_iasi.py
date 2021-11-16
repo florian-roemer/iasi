@@ -163,7 +163,7 @@ def process_data(radiance, angle, mask, domain, orbit, lat, scale):
     '''
 
     nobs = np.count_nonzero(mask)
-    frac = np.count_nonzero(mask)/mask.size
+    frac = np.sum(mask*scale)/np.sum(scale)
 
     rad, ang = masked_average(radiance, angle, mask, lat, scale)
     meanangle, meanrad = average_symmetric_angles(ang, rad)
