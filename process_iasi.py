@@ -3,9 +3,9 @@
 """
 This scripts filters and averages IASI spectral radiances from one orbit and
 calculates spectral fluxes using angular interpolation and integration.
-It currently calculates the mean spectral fluxes over eight domains, namely
+It currently calculates the mean spectral fluxes over 12 domains, namely
 all combinations of:
-    1) global and tropics
+    1) global, tropics and extra-tropics
     2) all-sky and clear-sky
     3) land+ocean and ocean-only
 
@@ -16,16 +16,14 @@ The script takes three input parameters:
 
 that should be processed. The script then loops over all orbits on that day
 and calculates average spectral fluxes for each of them separately.
-The output are three .npy type files. They can be read in using numpy's
-numpy.save and numpy.load routines (pickle=False):
+The output are two .npy type files. They can be read using numpy's
+numpy.load routine (pickle=False):
     1) flux_<DATE_AND_TIME_OF_ORBIT>: spectral flux for each of IASI's 8461
     channels
-    2) nobs_<DATE_AND_TIME_OF_ORBIT>: number of pixels used for this mean
-    3) frac_<DATE_AND_TIME_OF_ORBIT>: fraction of pixels used relative to total
+    2) area_<DATE_AND_TIME_OF_ORBIT>: total area (number of pixels weighted by
+    the cosine of the latitude and corrected for oversampling)
 
-The first two are needed for calculating weighted averages of multiple orbits,
-the last one for inferring the values for the 1) extratropics 2) "cloudy"-sky
-3) land-only.
+They are needed for calculating monthly weighted averages of multiple orbits.
 
 To run this script on mistral first run in terminal:
 module load anaconda3/.bleeding_edge
@@ -46,13 +44,10 @@ import read_iasi as ri
 def read_data(FILEPATH):
     '''
     read IASI data from eps file using readin_eps reading routine
-    only read spectra (sub-) tropical latitudes (empirical)
     '''
     idata = ri.data(FILEPATH)
-
     idata.get_orbit_lat_lon()
     idata.get_spec_orbit()
-
     print(f'input radiance: {idata.spectra_orbit[0, 1000:1005, 0, 0]}')
 
     return idata
@@ -61,7 +56,6 @@ def read_data(FILEPATH):
 def create_mask(lat, land_frac, cloud_frac, domain):
     '''
     This function creates the mask for the selected domain.
-
     '''
     # initialize
     mask = np.full((lat.shape[0], lat.shape[1], lat.shape[2], 1),
@@ -77,10 +71,8 @@ def create_mask(lat, land_frac, cloud_frac, domain):
         mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], trop[:, :, :, 0])
     if 'extra' in domain:
         mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], ~trop[:, :, :, 0])
-
     if 'clear-sky' in domain:
         mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], clear_sky)
-
     if 'ocean-only' in domain:
         mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], ocean)
 
@@ -90,37 +82,43 @@ def create_mask(lat, land_frac, cloud_frac, domain):
 def masked_average(radiance, angle, mask, lat, scale):
     '''
     This functions averages the fluxes along track as well as over each
-    scanning angle (4 pixels per scanning angle), apllying the three different
+    scanning angle (4 pixels per scanning angle), applying the three different
     masks.
     '''
+    weight_sum = np.zeros((30, 1))
+    weight_sum = np.sum(mask * scale, axis=(0, 2))
 
     # apply masks and average over all scans and all pixels per scan
     rad = np.divide(np.sum(radiance * mask, axis=(0, 2)),
-                    np.sum(mask * scale, axis=(0, 2)))
+                    weight_sum)
     ang = np.divide(np.sum(angle * (mask * scale)[:, :, :, 0], axis=(0, 2)),
-                    np.sum((mask * scale)[:, :, :, 0], axis=(0, 2)))
+                    weight_sum[:, 0])
 
-    return rad, ang
+    return rad, ang, weight_sum
 
 
-def average_symmetric_angles(ang, rad):
+def average_symmetric_angles(ang, rad, weight_sum):
     '''
     Assuming azimuthal symmetry, corresponding (opposite) scanning angles are
     averaged together.
     '''
-    # average over symmetric zenith angles
+    # average over symmetric zenith angles (apply weights from before)
+    weight_sum = weight_sum[:, 0]
     meanangle = np.zeros((15))
     meanrad = np.zeros((15, 8461))
     for m in range(len(meanangle)):
-        meanangle[-m-1] = np.mean((ang[m], ang[-m-1]))
-        meanrad[-m-1] = np.mean(np.array((rad[m, :], rad[-m-1, :])), axis=0)
+        meanangle[-m-1] = np.average((ang[m], ang[-m-1]), axis=0,
+                                     weights=(weight_sum[m], weight_sum[-m-1]))
+        meanrad[-m-1] = np.average(np.array((rad[m, :], rad[-m-1, :])), axis=0,
+                                   weights=(weight_sum[m], weight_sum[-m-1]))
 
     return meanangle, meanrad
 
 
 def prepare_interpolation(meanangle, meanrad):
     '''
-    Initialises arrays for angular interpolation (cosine weighted)
+    Initialises arrays for angular interpolation (weighted with cosine of
+    zenith angle).
     '''
     # weight radiance with cosine of zenith angle
     cosangle = np.zeros((15, 1))
@@ -138,7 +136,7 @@ def prepare_interpolation(meanangle, meanrad):
 
 def interpolate(fullangle, radcos):
     '''
-    performs linear angular interpolations of spectral I*cos(theta)
+    Performs linear angular interpolations of spectral I*cos(theta).
     '''
     for i in range(radcos.shape[1]):
         interp = scipy.interpolate.interp1d((fullangle[14, 0], 90),
@@ -150,7 +148,7 @@ def interpolate(fullangle, radcos):
 
 def calc_specflux(radcos, fullangle):
     '''
-    integrates over all wavenumber to calculated spectral flux
+    Integrates over all wavenumber to calculated spectral flux.
     '''
     specflux = np.zeros(radcos.shape[1])
     for i in range(specflux.shape[0]):
@@ -161,35 +159,31 @@ def calc_specflux(radcos, fullangle):
     return specflux
 
 
+def save_flux(specflux, area, year, month, orbit, domain):
+    '''
+    Average spectral fluxes and total area are saved.
+    '''
+    path = '/work/um0878/user_data/froemer/rare_mistral/data/IASI/final/'\
+           f'{domain}/{year}/{month}'
+    np.save(f'{path}/area_{orbit}', area,
+            allow_pickle=False, fix_imports=False)
+    np.save(f'{path}/flux_{orbit}', specflux,
+            allow_pickle=False, fix_imports=False)
+
+
 def process_data(radiance, angle, mask, domain, orbit, lat, scale):
     '''
-    Encapsulates processing steps applied to the different domains (masks).
+    Encapsulates processing steps applied to the different domains.
     '''
-
     area = np.sum(mask*scale)
-
-    rad, ang = masked_average(radiance, angle, mask, lat, scale)
-    meanangle, meanrad = average_symmetric_angles(ang, rad)
+    rad, ang, weight_sum = masked_average(radiance, angle, mask, lat, scale)
+    meanangle, meanrad = average_symmetric_angles(ang, rad, weight_sum)
     fullangle, radcos = prepare_interpolation(meanangle, meanrad)
     radcos = interpolate(fullangle, radcos)
     specflux = calc_specflux(radcos, fullangle)
     save_flux(specflux, area, year, month, orbit, domain)
 
     print(f'output flux for domain {domain}: {specflux[1000]}')
-
-
-def save_flux(specflux, area, year, month, orbit, domain):
-    '''
-    Averaged fluxes and number of considered pixels are saved.
-    '''
-
-    path = '/work/um0878/user_data/froemer/rare_mistral/data/IASI/final/'\
-           f'{domain}/{year}/{month}'
-
-    np.save(f'{path}/area_{orbit}', area,
-            allow_pickle=False, fix_imports=False)
-    np.save(f'{path}/flux_{orbit}', specflux,
-            allow_pickle=False, fix_imports=False)
 
 
 def main(FILE):
