@@ -26,7 +26,7 @@ numpy.save and numpy.load routines (pickle=False):
 The first two are needed for calculating weighted averages of multiple orbits,
 the last one for inferring the values for the 1) extratropics 2) "cloudy"-sky
 3) land-only.
-    
+
 To run this script on mistral first run in terminal:
 module load anaconda3/.bleeding_edge
 
@@ -75,8 +75,12 @@ def create_mask(lat, land_frac, cloud_frac, domain):
     # create masks
     if 'tropics' in domain:
         mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], trop[:, :, :, 0])
+    if 'extra' in domain:
+        mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], ~trop[:, :, :, 0])
+
     if 'clear-sky' in domain:
         mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], clear_sky)
+
     if 'ocean-only' in domain:
         mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], ocean)
 
@@ -162,33 +166,30 @@ def process_data(radiance, angle, mask, domain, orbit, lat, scale):
     Encapsulates processing steps applied to the different domains (masks).
     '''
 
-    nobs = np.count_nonzero(mask)
-    frac = np.sum(mask*scale)/np.sum(scale)
+    area = np.sum(mask*scale)
 
     rad, ang = masked_average(radiance, angle, mask, lat, scale)
     meanangle, meanrad = average_symmetric_angles(ang, rad)
     fullangle, radcos = prepare_interpolation(meanangle, meanrad)
     radcos = interpolate(fullangle, radcos)
     specflux = calc_specflux(radcos, fullangle)
-    save_flux(specflux, nobs, frac, year, month, orbit, domain)
+    save_flux(specflux, area, year, month, orbit, domain)
 
     print(f'output flux for domain {domain}: {specflux[1000]}')
 
 
-def save_flux(specflux, nobs, frac, year, month, orbit, domain):
+def save_flux(specflux, area, year, month, orbit, domain):
     '''
     Averaged fluxes and number of considered pixels are saved.
     '''
 
-    np.save(f'/work/um0878/user_data/froemer/rare_mistral/data/IASI/test_new/'
-            f'test/{domain}/{year}/{month}/nobs_{orbit}',
-            nobs, allow_pickle=False, fix_imports=False)
-    np.save(f'/work/um0878/user_data/froemer/rare_mistral/data/IASI/test_new/'
-            f'test/{domain}/{year}/{month}/flux_{orbit}',
-            specflux, allow_pickle=False, fix_imports=False)
-    np.save(f'/work/um0878/user_data/froemer/rare_mistral/data/IASI/test_new/'
-            f'test/{domain}/{year}/{month}/frac_{orbit}',
-            frac, allow_pickle=False, fix_imports=False)
+    path = '/work/um0878/user_data/froemer/rare_mistral/data/IASI/final/'\
+           f'{domain}/{year}/{month}'
+
+    np.save(f'{path}/area_{orbit}', area,
+            allow_pickle=False, fix_imports=False)
+    np.save(f'{path}/flux_{orbit}', specflux,
+            allow_pickle=False, fix_imports=False)
 
 
 def main(FILE):
@@ -219,7 +220,7 @@ def main(FILE):
     # sup-polar latitudes
     radiance = radiance * scale
 
-    for dom1 in ['global', 'tropics']:
+    for dom1 in ['global', 'tropics', 'extra']:
         for dom2 in ['all-sky', 'clear-sky']:
             for dom3 in ['land+ocean', 'ocean-only']:
                 domain = f'{dom1}/{dom2}/{dom3}'
@@ -233,7 +234,7 @@ if __name__ == '__main__':
     year = sys.argv[1]
     month = sys.argv[2]
     day = sys.argv[3]
-    
+
     PATH = f'/work/um0878/data/iasi/iasi-l1/reprocessed/m02/'\
            f'{year}/{month}/{day}/'
 
