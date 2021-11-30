@@ -3,35 +3,33 @@
 """
 This scripts filters and averages IASI spectral radiances from one orbit and
 calculates spectral fluxes using angular interpolation and integration.
-It currently calculates the mean spectral fluxes over eight domains, namely
+It currently calculates the mean spectral fluxes over 12 domains, namely
 all combinations of:
-    1) global and tropics
+    1) global, tropics and extra-tropics
     2) all-sky and clear-sky
     3) land+ocean and ocean-only
+
 The script takes three input parameters:
     1) the year,
     2) the month,
     3) and the day
+
 that should be processed. The script then loops over all orbits on that day
 and calculates average spectral fluxes for each of them separately.
-The output are three .npy type files. They can be read in using numpy's
-numpy.save and numpy.load routines (pickle=False):
+The output are two .npy type files. They can be read using numpy's
+numpy.load routine (pickle=False):
     1) flux_<DATE_AND_TIME_OF_ORBIT>: spectral flux for each of IASI's 8461
     channels
-    2) nobs_<DATE_AND_TIME_OF_ORBIT>: number of pixels used for this mean
-    3) frac_<DATE_AND_TIME_OF_ORBIT>: fraction of pixels used relative to total
+    2) area_<DATE_AND_TIME_OF_ORBIT>: total area (number of pixels weighted by
+    the cosine of the latitude and corrected for oversampling)
 
-The first two are needed for calculating weighted averages of multiple orbits,
-the last one for inferring the values for the 1) extratropics 2) "cloudy"-sky
-3) land-only.
-
+They are needed for calculating monthly weighted averages of multiple orbits.
 
 @author: Florian Roemer (florian.roemer@uni-hamburg.de)
 """
 
 import glob
 import numpy as np
-import os
 import scipy.integrate
 import scipy.interpolate
 import sys
@@ -43,13 +41,10 @@ import read_iasi as ri
 def read_data(FILEPATH):
     '''
     read IASI data from eps file using readin_eps reading routine
-    only read spectra (sub-) tropical latitudes (empirical)
     '''
     idata = ri.data(FILEPATH)
-
     idata.get_orbit_lat_lon()
     idata.get_spec_orbit()
-
     print(f'input radiance: {idata.spectra_orbit[0, 1000:1005, 0, 0]}')
 
     return idata
@@ -70,7 +65,9 @@ def create_mask(lat, land_frac, cloud_frac, domain):
 
     # create masks
     if 'tropics' in domain:
-         mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], trop[:, :, :, 0])
+        mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], trop[:, :, :, 0])
+    if 'extra' in domain:
+        mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], ~trop[:, :, :, 0])
     if 'clear-sky' in domain:
         mask[:, :, :, 0] = np.logical_and(mask[:, :, :, 0], clear_sky)
     if 'ocean-only' in domain:
@@ -82,34 +79,43 @@ def create_mask(lat, land_frac, cloud_frac, domain):
 def masked_average(radiance, angle, mask, lat, scale):
     '''
     This functions averages the fluxes along track as well as over each
-    scanning angle (4 pixels per scanning angle), apllying the three different
+    scanning angle (4 pixels per scanning angle), applying the three different
     masks.
     '''
+    weight_sum = np.zeros((30, 1))
+    weight_sum = np.sum(mask * scale, axis=(0, 2))
+
     # apply masks and average over all scans and all pixels per scan
     rad = np.divide(np.sum(radiance * mask, axis=(0, 2)),
-                    np.sum(mask * scale, axis=(0, 2)))
+                    weight_sum)
     ang = np.divide(np.sum(angle * (mask * scale)[:, :, :, 0], axis=(0, 2)),
-                    np.sum((mask * scale)[:, :, :, 0], axis=(0, 2)))
+                    weight_sum[:, 0])
+
+    return rad, ang, weight_sum
 
 
-def average_symmetric_angles(ang, rad):
+def average_symmetric_angles(ang, rad, weight_sum):
     '''
     Assuming azimuthal symmetry, corresponding (opposite) scanning angles are
     averaged together.
     '''
-    # average over symmetric zenith angles
+    # average over symmetric zenith angles (apply weights from before)
+    weight_sum = weight_sum[:, 0]
     meanangle = np.zeros((15))
     meanrad = np.zeros((15, 8461))
     for m in range(len(meanangle)):
-        meanangle[-m-1] = np.mean((ang[m], ang[-m-1]))
-        meanrad[-m-1] = np.mean(np.array((rad[m, :], rad[-m-1, :])), axis=0)
+        meanangle[-m-1] = np.average((ang[m], ang[-m-1]), axis=0,
+                                     weights=(weight_sum[m], weight_sum[-m-1]))
+        meanrad[-m-1] = np.average(np.array((rad[m, :], rad[-m-1, :])), axis=0,
+                                   weights=(weight_sum[m], weight_sum[-m-1]))
 
     return meanangle, meanrad
 
 
 def prepare_interpolation(meanangle, meanrad):
     '''
-    Initialises arrays for angular interpolation (cosine weighted)
+    Initialises arrays for angular interpolation (weighted with cosine of
+    zenith angle).
     '''
     # weight radiance with cosine of zenith angle
     cosangle = np.zeros((15, 1))
@@ -139,7 +145,7 @@ def interpolate(fullangle, radcos):
 
 def calc_specflux(radcos, fullangle):
     '''
-    integrates over all wavenumber to calculated spectral flux
+    Integrates over all wavenumber to calculated spectral flux.
     '''
     specflux = np.zeros(radcos.shape[1])
     for i in range(specflux.shape[0]):
@@ -150,39 +156,31 @@ def calc_specflux(radcos, fullangle):
     return specflux
 
 
+def save_flux(specflux, area, year, month, orbit, domain):
+    '''
+    Average spectral fluxes and total area are saved.
+    '''
+    path = f'/DSNNAS/Repro_Temp/users/vijuj/data/iasi_flux/{domain}/'\
+           f'{year}/{month}'
+    np.save(f'{path}/area_{orbit}', area,
+            allow_pickle=False, fix_imports=False)
+    np.save(f'{path}/flux_{orbit}', specflux,
+            allow_pickle=False, fix_imports=False)
+
+
 def process_data(radiance, angle, mask, domain, orbit, lat, scale):
     '''
-    Encapsulates processing steps applied to the different domains (masks).
+    Encapsulates processing steps applied to the different domains.
     '''
-
-    nobs = np.count_nonzero(mask)
-    frac = np.sum(mask*scale)/np.sum(scale)
-
-    rad, ang = masked_average(radiance, angle, mask, lat, scale)
-    meanangle, meanrad = average_symmetric_angles(ang, rad)
+    area = np.sum(mask*scale)
+    rad, ang, weight_sum = masked_average(radiance, angle, mask, lat, scale)
+    meanangle, meanrad = average_symmetric_angles(ang, rad, weight_sum)
     fullangle, radcos = prepare_interpolation(meanangle, meanrad)
     radcos = interpolate(fullangle, radcos)
     specflux = calc_specflux(radcos, fullangle)
-    save_flux(specflux, nobs, frac, year, month, orbit, domain)
+    save_flux(specflux, area, year, month, orbit, domain)
 
     print(f'output flux for domain {domain}: {specflux[1000]}')
-
-
-def save_flux(specflux, nobs, frac, year, month, orbit, domain):
-    '''
-    Averaged fluxes (specflux), number of filtered pixels (nobs)
-    and fraction of total pixels used are saved.
-    '''
-
-    np.save(f'/DSNNAS/Repro_Temp/users/vijuj/data/iasi_flux/{domain}/'
-            f'{year}/{month}/flux_{}', specflux,
-            allow_pickle=False, fix_imports=False)
-    np.save(f'/DSNNAS/Repro_Temp/users/vijuj/data/iasi_flux/{domain}/'
-            f'{year}/{month}/nobs_{orbit}', nobs,
-            allow_pickle=False, fix_imports=False)
-    np.save(f'/DSNNAS/Repro_Temp/users/vijuj/data/iasi_flux/{domain}/'
-            f'{year}/{month}/frac_{}', frac,
-            allow_pickle=False, fix_imports=False)
 
 
 def main(FILE):
@@ -203,7 +201,7 @@ def main(FILE):
     
     # read factor correcting systematic oversampling of sub-polar latitudes
     # using 180 bins from -90 to 90, they are centered at -89.5, -88.5 ... 89.5
-    factor = np.load('factor.npy')
+    factor = np.load('/DSNNAS/Repro_Temp/users/vijuj/git/iasi/factor.npy')
     index = np.round(lat + 89.5).astype('int')
     weight = factor[index]
     cos = np.cos(np.deg2rad(lat))
@@ -213,7 +211,7 @@ def main(FILE):
     # sup-polar latitudes
     radiance = radiance * scale
 
-    for dom1 in ['global', 'tropics']:
+    for dom1 in ['global', 'tropics', 'extra']:
         for dom2 in ['all-sky', 'clear-sky']:
             for dom3 in ['land+ocean', 'ocean-only']:
                 domain = f'{dom1}/{dom2}/{dom3}'
@@ -223,7 +221,6 @@ def main(FILE):
 
 if __name__ == '__main__':
     start = time.process_time()
-    os.chdir('/DSNNAS/Repro_Temp/users/vijuj/git/iasi/')
 
     year = sys.argv[1]
     month = sys.argv[2]
