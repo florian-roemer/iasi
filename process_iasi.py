@@ -204,7 +204,7 @@ def main(FILE):
 
     # read factor correcting systematic oversampling of sub-polar latitudes
     # using 180 bins from -90 to 90, they are centered at -89.5, -88.5 ... 89.5
-    factor = np.load('factor.npy')
+    factor = np.load('/pf/u/u301023/iasi/factor.npy')
     index = np.round(lat + 89.5).astype('int')
     weight = factor[index]
     cos = np.cos(np.deg2rad(lat))
