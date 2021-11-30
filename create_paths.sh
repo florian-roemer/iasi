@@ -2,7 +2,7 @@
 
 data='/DSNNAS/Repro_Temp/users/vijuj/data/iasi_flux'
 
-domain1=( "global" "tropics")
+domain1=( "global" "tropics" "extra" )
 domain2=( "all-sky" "clear-sky")
 domain3=( "land+ocean" "ocean-only")
 
