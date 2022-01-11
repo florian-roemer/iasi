@@ -1,6 +1,6 @@
 #!/bin/bash
 
-data='/work/um0878/user_data/froemer/rare_mistral/data/IASI/final'
+data='/scratch/uni/u237/user_data/froemer/iasi/data/'
 
 domain1=( "global" "tropics" "extra" )
 domain2=( "all-sky" "clear-sky" )

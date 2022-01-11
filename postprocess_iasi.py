@@ -16,17 +16,20 @@ def orbits_to_monthly_mean(domain, year, month):
     import pandas as pd
     import glob
 
-    path = '/work/um0878/user_data/froemer/rare_mistral/data/IASI/test_new/'\
-           'test/{}/{}/{}/'.format(domain, year, month)
+    path = '/scratch/uni/u237/user_data/vojohn/iasi_flux/'\
+            f'{domain}/{year}/{month}'
+    path2 = '/scratch/uni/u237/user_data/froemer/iasi/data/'\
+            f'{domain}/{year}/{month}'
+    
+    fluxes_all = np.zeros((int(len(glob.glob(f'{path}/flux*', recursive=True))),
+                               8461))
+    area_all = np.zeros((int(len(glob.glob(f'{path}/area*', recursive=True)))))
 
-    fluxes_all = np.zeros((int(len(glob.glob(path + 'flux*', recursive=True))),
-                           8461))
-    area_all = np.zeros((int(len(glob.glob(path + 'area*', recursive=True)))))
     i, j = np.zeros(2, dtype=int)
 
     # Extract items containing numbers in name
-    file = glob.glob(path + 'flux*', recursive=True)
-    file2 = glob.glob(path + 'area*', recursive=True)
+    file = glob.glob(f'{path}/flux*', recursive=True)
+    file2 = glob.glob(f'{path}/area*', recursive=True)
 
     # Filter only files
     file = [f for f in file if os.path.isfile(f)]
@@ -63,10 +66,10 @@ def orbits_to_monthly_mean(domain, year, month):
     total_area = np.sum(area)
     total_area_squared = np.sum(area**2)
 
-    np.save(f'{path}/avg_flux.npy', avg, allow_pickle=False, fix_imports=False)
-    np.save(f'{path}/avg_flux_squared.npy', avg_squared, allow_pickle=False,
+    np.save(f'{path2}/avg_flux.npy', avg, allow_pickle=False, fix_imports=False)
+    np.save(f'{path2}/avg_flux_squared.npy', avg_squared, allow_pickle=False,
             fix_imports=False)
-    np.save(f'{path}/total_area.npy', total_area,
+    np.save(f'{path2}/total_area.npy', total_area,
             allow_pickle=False, fix_imports=False)
     np.save(f'{path}/total_area_squared.npy', total_area_squared,
             allow_pickle=False, fix_imports=False)
@@ -76,19 +79,32 @@ def orbits_to_monthly_mean(domain, year, month):
 
 if __name__ == '__main__':
     start = time.process_time()
-    # os.chdir('/work/um0878/user_data/froemer/rare_mistral/scripts/')
+    os.chdir('/scratch/uni/u237/user_data/froemer/iasi/')
 
-    year = sys.argv[1]
-    month = sys.argv[2]
-
-    # year, month = '2011', '01'
+#    year = sys.argv[1]
+#    month = sys.argv[2]
+    
+    year, month = '2007', '07'
 
     print(year, month)
 
-    used = [0, 1, 3, 4, 9, 10, 12, 13, 18, 19, 21, 22]
-
-    domains = np.load('/work/um0878/user_data/froemer/rare_mistral/data/IASI/'
-                      'test_new/test/domains.npy')[used]
+    domains = ['global/all-sky/land+ocean',
+              'global/all-sky/ocean-only',
+              'global/clear-sky/land+ocean',
+              'global/clear-sky/ocean-only',
+              'tropics/all-sky/land+ocean',
+              'tropics/all-sky/ocean-only',
+              'tropics/clear-sky/land+ocean',
+              'tropics/clear-sky/ocean-only',
+              'extra/all-sky/land+ocean',
+              'extra/all-sky/ocean-only',
+              'extra/clear-sky/land+ocean',
+              'extra/clear-sky/ocean-only']
+    
+#
+#    np.save('/work/um0878/user_data/froemer/rare_mistral/data/IASI/test_new/'
+#            'test/domains.npy', domains)
+#
 
 #    months = []
 #    for year in [2011, 2013, 2016, 2017]:
