@@ -71,7 +71,7 @@ def orbits_to_monthly_mean(domain, year, month):
             fix_imports=False)
     np.save(f'{path2}/total_area.npy', total_area,
             allow_pickle=False, fix_imports=False)
-    np.save(f'{path}/total_area_squared.npy', total_area_squared,
+    np.save(f'{path2}/total_area_squared.npy', total_area_squared,
             allow_pickle=False, fix_imports=False)
 
     return fluxes, avg, std, area
