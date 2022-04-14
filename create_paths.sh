@@ -1,7 +1,7 @@
 #!/bin/bash
 
-data='/scratch/uni/u237/user_data/froemer/iasi/data/'
-
+#data='/scratch/uni/u237/user_data/froemer/iasi/data/'
+data='~/iasi/avg_error'
 domain1=( "global" "tropics" "extra" )
 domain2=( "all-sky" "clear-sky" )
 domain3=( "land+ocean" "ocean-only" ) 

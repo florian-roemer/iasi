@@ -96,21 +96,41 @@ model_cf_lat = np.histogram(lat_cf, bins=192)
 model_wap_lat = np.histogram(lat_wap, bins=192)
 
 plt.figure(figsize=(15, 6))
-plt.step((model_cf_lat[1])[:-1], np.cos(np.deg2rad(model_cf_lat[1])[:-1])*model_cf_lat[0]/
+plt.step((model_cf_lat[1])[:-1], 100*np.cos(np.deg2rad(model_cf_lat[1])[:-1])*model_cf_lat[0]/
          np.sum(np.cos(np.deg2rad(model_cf_lat[1])[:-1])*model_cf_lat[0]), linewidth=2, 
          label=f'MPI: cloud fraction filter (N={np.sum(model_cf_lat[0])})')
-plt.step((model_wap_lat[1])[:-1], np.cos(np.deg2rad(model_wap_lat[1])[:-1])*model_wap_lat[0]/
+plt.step((model_wap_lat[1])[:-1], 100*np.cos(np.deg2rad(model_wap_lat[1])[:-1])*model_wap_lat[0]/
          np.sum(np.cos(np.deg2rad(model_wap_lat[1])[:-1])*model_wap_lat[0]), linewidth=2, 
          label=f'MPI: omega filter (N={np.sum(model_wap_lat[0])})')
-plt.step((lathist_cf[1])[:-1], np.cos(np.deg2rad(lathist_cf[1])[:-1])*(lathist_cf[0]*factor)/
+plt.step((lathist_cf[1])[:-1], 100*np.cos(np.deg2rad(lathist_cf[1])[:-1])*(lathist_cf[0]*factor)/
          np.sum(np.cos(np.deg2rad(lathist_cf[1])[:-1])*lathist_cf[0]*factor),
+         linewidth=2, label=f'IASI: cloud filter (N={int(np.sum(lathist_cf[0]*factor))})')
+plt.step((lathist[1])[:-1], 100*np.cos(np.deg2rad(lathist[1])[:-1])*(lathist[0]*factor)/
+         np.sum(np.cos(np.deg2rad(lathist[1])[:-1])*lathist[0]*factor),
          linewidth=2, label=f'IASI: cloud filter (N={int(np.sum(lathist_cf[0]*factor))})')
 plt.xlim(-85, 85)
 plt.legend(fontsize=16)
 plt.yticks(fontsize=16)
 plt.xticks(fontsize=16)
 plt.xlabel('latitude', fontsize=18)
-plt.ylabel('relative frequency (%)', fontsize=18)
+plt.ylabel('area fraction (%)', fontsize=18)
+
+# %% index for subtropics
+i1 = np.where((abs(model_cf_lat[1])[:-1] <= 40) & (abs(model_cf_lat[1])[:-1] >= 10))
+i2 = np.where((abs(model_wap_lat[1])[:-1] <= 40) & (abs(model_wap_lat[1])[:-1] >= 10))
+i3 = np.where((abs(lathist_cf[1])[:-1] <= 40) & (abs(lathist_cf[1])[:-1] >= 10))
+
+rf1 = 100 * np.sum((model_cf_lat[0])[i1]) / np.sum(model_cf_lat[0])
+af1 = 100 * np.sum((np.cos(np.deg2rad(model_cf_lat[1])[:-1])*model_cf_lat[0])[i1]) / \
+    np.sum(np.cos(np.deg2rad(model_cf_lat[1])[:-1])*model_cf_lat[0])
+
+rf2 = 100 * np.sum((model_wap_lat[0])[i1]) / np.sum(model_wap_lat[0])
+af2 = 100 * np.sum((np.cos(np.deg2rad(model_wap_lat[1])[:-1])*model_wap_lat[0])[i1]) / \
+    np.sum(np.cos(np.deg2rad(model_wap_lat[1])[:-1])*model_wap_lat[0])
+
+rf3 = 100 * np.sum((lathist_cf[0])[i3]) / np.sum(lathist_cf[0])
+af3 = 100 * np.sum((np.cos(np.deg2rad(lathist_cf[1])[:-1])*lathist_cf[0])[i3]) / \
+    np.sum(np.cos(np.deg2rad(lathist_cf[1])[:-1])*lathist_cf[0])
 
 # %%
 model_cf_lon = np.histogram(lon_cf, bins=384)
